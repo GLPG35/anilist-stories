@@ -3,14 +3,12 @@
 Website app made for the creation of review templates for Instagram stories.
 
 ## Website
----
 
 The website is free to use and access from this URL:
 
 http://anilist-stories.vercel.app/
 
 ## Examples
----
 
 ### Toradora!
 
@@ -25,7 +23,6 @@ http://anilist-stories.vercel.app/
 <img src="https://i.imgur.com/aq2Eia6.png" width="45%" />
 
 ## How to use
----
 
 The website is pretty simple, the only thing you need is to enter the Review ID and it will generate the template based on the info retrieved.
 
