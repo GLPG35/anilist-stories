@@ -8,18 +8,52 @@
 	gap: 2em;
 	padding: 2em;
 
-	input {
-		border: none;
-		outline: none;
-		font-family: 'Roboto';
-		font-size: 0.9em;
-		padding: 1em 1.5em;
-		background-color: #151f2e;
-		color: #9fadbd;
-		border-radius: 5px;
+	.inputs {
+		display: flex;
+		align-items: center;
+		gap: 1em;
 
-		&::placeholder {
+		input {
+			border: none;
+			outline: none;
+			font-family: 'Roboto';
+			font-size: 0.9em;
+			padding: 1em 1.5em;
+			background-color: #151f2e;
 			color: #9fadbd;
+			border-radius: 5px;
+	
+			&::placeholder {
+				color: #9fadbd;
+			}
+		}
+
+		button {
+			padding: 1em 1.5em;
+			font-size: 0.9em;
+			font-family: 'Roboto';
+			font-weight: 500;
+			background-color: #151f2e;
+			border: none;
+			outline: none;
+			color: #9fadbd;
+			border-radius: 5px;
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 0.5em;
+			transition: 0.2s ease-out;
+
+			&:hover {
+				color: #3db3f2;
+			}
+
+			.icon {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
 		}
 	}
 
@@ -148,6 +182,10 @@
 				.by {
 					font-weight: 400;
 					color: #9fadbd;
+
+					&:first-child {
+						padding-top: 0.5em;
+					}
 				}
 			}
 		}

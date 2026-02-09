@@ -23,6 +23,30 @@ type Review = {
 	}
 }
 
+type Activity = {
+	id: number,
+	user: {
+		id: number,
+		name: string,
+	},
+	status: string
+	media: {
+		id: number,
+		title: {
+			romaji: string
+		},
+		bannerImage: string,
+		coverImage: {
+			extraLarge: string
+		}
+	},
+	createdAt: number
+}
+
+interface FinalActivity extends Activity {
+	score: number
+}
+
 const query = `
 	query Review($reviewId: Int) {
 		Review(id: $reviewId) {
@@ -47,6 +71,40 @@ const query = `
 	}
 `
 
+const queryScore = `
+	query($activityId: Int) {
+		Activity(id: $activityId) {
+			... on ListActivity {
+				id
+				user {
+					id,
+					name
+				}
+				status
+				media {
+					id
+					title {
+						romaji
+					}
+					bannerImage
+					coverImage {
+						extraLarge
+					}
+				}
+				createdAt
+			}
+		}
+	}  
+`
+
+const queryScore2 = `
+	query MediaList($userId: Int, $mediaId: Int, $format: ScoreFormat) {
+		MediaList(userId: $userId, mediaId: $mediaId) {
+		score(format: $format)
+		}
+	}
+`
+
 const options: RequestInit = {
 	method: 'POST',
 	headers: {
@@ -57,7 +115,9 @@ const options: RequestInit = {
 
 const App = () => {
 	const [review, setReview] = useState<Review>()
+	const [activity, setActivity] = useState<FinalActivity>()
 	const [id, setId] = useState<number>()
+	const [score, setScore] = useState(false)
 	const [loadingCopy, setLoadingCopy] = useState(false)
 	const [copied, setCopied] = useState(false)
 	const storyRef = useRef<HTMLDivElement>(null)
@@ -65,27 +125,72 @@ const App = () => {
 
 	useEffect(() => {
 		if (id) {
-			const variables = {
-				reviewId: id
+			if (score) {
+				const variables = {
+					activityId: id
+				}
+
+				options.body = JSON.stringify({
+					query: queryScore,
+					variables
+				})
+			} else {
+				const variables = {
+					reviewId: id
+				}
+				
+				options.body = JSON.stringify({
+					query,
+					variables
+				})
 			}
-			
-			options.body = JSON.stringify({
-				query,
-				variables
-			})
 
 			fetch('https://graphql.anilist.co', options)
 			.then(res => res.json().then(async json => {
 				if (res.ok) {
-					const review = json.data.Review
+					if (score) {
+						const activity = json.data.Activity as Activity
+						const bannerImage = activity.media.bannerImage && `${import.meta.env.VITE_PROXY}/image?q=${activity.media.bannerImage}`
+						const coverImage = `${import.meta.env.VITE_PROXY}/image?q=${activity.media.coverImage.extraLarge}`
 
-					const bannerImage = review.media.bannerImage ? `${import.meta.env.VITE_PROXY}/image?q=${review.media.bannerImage}` : undefined
-					const coverImage = `${import.meta.env.VITE_PROXY}/image?q=${review.media.coverImage.extraLarge}`
+						activity.media.bannerImage = bannerImage
+						activity.media.coverImage.extraLarge = coverImage
 
-					review.media.bannerImage = bannerImage
-					review.media.coverImage.extraLarge = coverImage
-					
-					setReview(review)
+						const variables = {
+							userId: activity.user.id,
+							mediaId: activity.media.id,
+							format: 'POINT_100'
+						}
+						
+						options.body = JSON.stringify({
+							query: queryScore2,
+							variables
+						})
+						
+						fetch('https://graphql.anilist.co', options)
+						.then(res => res.json().then(async json => {
+							if (res.ok) {
+								const { score } = json.data.MediaList
+
+								const finalActivity = {
+									...activity,
+									score
+								}
+
+								setActivity(finalActivity)
+							}
+						}))
+					} else {
+						const review = json.data.Review
+
+						const bannerImage = review.media.bannerImage ? `${import.meta.env.VITE_PROXY}/image?q=${review.media.bannerImage}` : undefined
+						const coverImage = `${import.meta.env.VITE_PROXY}/image?q=${review.media.coverImage.extraLarge}`
+	
+						review.media.bannerImage = bannerImage
+						review.media.coverImage.extraLarge = coverImage
+						
+						setReview(review)
+					}
 				} else {
 					Promise.reject(json)
 				}
@@ -95,7 +200,7 @@ const App = () => {
 
 	useEffect(() => {
 		resizeText()
-	}, [review])
+	}, [review, activity])
 
 	const scoreColor = (score: number) => {
 		if (score >= 66) return styles.green
@@ -109,14 +214,22 @@ const App = () => {
 
 		if (!value) return
 
-		setId(+value)
+		try {
+			const url = new URL(value)
+			const id = url.pathname.split('/').pop()
+			if (!id || isNaN(+id)) return
+
+			setId(+id)
+		} catch {
+			setId(+value)
+		}
 	}
 
 	const downloadStory = () => {
-		if (storyRef.current && review) {
+		if (storyRef.current && (!score && review || score && activity)) {
 			domToPng(storyRef.current, { scale: 3 }).then((dataURL: string) => {
 				const link = document.createElement('a')
-				link.download = `${review.media.title.romaji}_review_story.png`
+				link.download = `${!score && review ? review.media.title.romaji : score && activity && activity.media.title.romaji}_review_story.png`
 				link.href = dataURL
 				link.click()
 				link.remove()
@@ -125,7 +238,7 @@ const App = () => {
 	}
 
 	const copyStory = () => {
-		if (storyRef.current && review) {
+		if (storyRef.current && (!score && review || score && activity)) {
 			setLoadingCopy(true)
 			
 			domToBlob(storyRef.current, { scale: 3 }).then(blob => {
@@ -157,8 +270,66 @@ const App = () => {
 	
 	return (
 		<div className={styles.app}>
-			<input type="text" onInput={handleChange} placeholder='Enter review ID' />
-			{review &&
+			<div className={styles.inputs}>
+				<input type="text" onInput={handleChange} placeholder={score ? 'Enter activity ID or URL' : 'Enter review ID or URL'} />
+				<button onClick={() => setScore(!score)}>{score ? 'Review' : 'Completion'}</button>
+			</div>
+			{score && activity &&
+				<>
+					<div className={styles.story} ref={storyRef}>
+						<div className={styles.banner}>
+							<div className={styles.gradient}></div>
+							{activity.media.bannerImage && <img src={activity.media.bannerImage} alt="" />}
+						</div>
+						<div className={styles.solid}></div>
+						<div className={styles.data}>
+							<div className={styles.cover}>
+								<img src={activity.media.coverImage.extraLarge} alt="" />
+								<div className={`${styles.score} ${scoreColor(activity.score)}`}>
+									<div className={styles.value}>
+										{activity.score}
+										<div className={styles.total}><span>/100</span></div>
+									</div>
+								</div>
+							</div>
+							<div className={styles.info}>
+								<div className={styles.by}>{activity.user.name} {activity.status}</div>
+								<div className={styles.title} ref={titleRef}>{activity.media.title.romaji}</div>
+							</div>
+						</div>
+					</div>
+					<div className={styles.buttons}>
+						<button onClick={downloadStory}>
+							<div className={styles.icon}>
+								<PiDownloadSimpleBold />
+							</div>
+							Download
+						</button>
+						<button onClick={copyStory}>
+							{loadingCopy ?
+								<div className={styles.spinner}>
+									<PiCircleNotchBold />
+								</div>
+							: copied ?
+								<>
+									<div className={styles.icon}>
+										<PiCheckBold />
+									</div>
+									Copied!
+								</>
+							:
+								<>
+									<div className={styles.icon}>
+										<PiClipboardBold />
+									</div>
+									Copy
+								</>
+							}
+						</button>
+					</div>
+				</>
+			}
+			{!score && review &&
 				<>
 					<div className={styles.story} ref={storyRef}>
 						<div className={styles.banner}>
