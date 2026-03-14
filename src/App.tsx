@@ -265,7 +265,7 @@ const App = () => {
 		
 		const length = titleRef.current.innerText.length
 
-		titleRef.current.style.setProperty('--font-size', length > 19 ? 2.5 * (length / (length + 10)) + 'em' : '2.5em')
+		titleRef.current.style.setProperty('--font-size', length > 15 ? 2.5 * (length / (length + (length > 19 ? 10 : 5))) + 'em' : '2.5em')
 	}
 	
 	return (
